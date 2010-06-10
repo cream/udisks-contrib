@@ -19,6 +19,11 @@ def mount(device):
     stdout = proc.communicate()[0]
     return MOUNT_POINT_RE.search(stdout).group(1)
 
+def unmount(device):
+    if os.path.exists(device):
+        proc = Popen(['pumount', device])
+        proc.wait()
+
 class Device(dbus.Interface):
     def __init__(self, path):
         dbus.Interface.__init__(self,
@@ -31,7 +36,10 @@ class Device(dbus.Interface):
 
     fstype = cached_property(lambda self: self.get_property('IdType'))
     label = cached_property(lambda self: self.get_property('IdLabel'))
-    device_file = cached_property(lambda self: self.get_property('DeviceFile'))
+
+    @cached_property
+    def device_file(self):
+        return self.get_property('DeviceFile')
 
     @cached_property
     def description(self):
@@ -39,6 +47,9 @@ class Device(dbus.Interface):
 
     def mount(self):
         return mount(self.device_file)
+
+    def unmount(self):
+        unmount(self.device_file)
 
 class UDisks(dbus.Interface, gobject.GObject):
     __gsignals__ = {
@@ -76,6 +87,7 @@ class UDisks(dbus.Interface, gobject.GObject):
         except KeyError:
             pass # TODO?
         else:
+            device.unmount()
             self.emit('device-removed', device)
             del self.devices[path]
 
